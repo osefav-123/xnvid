@@ -5,9 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f0f0f">
 <title>VideoHub</title>
+<meta name="description" content="Watch videos on VideoHub.">
+<meta property="og:type" content="video.other">
+<meta property="og:site_name" content="VideoHub">
+<meta property="og:title" content="VideoHub">
+<meta property="og:description" content="Watch this video on VideoHub.">
+<meta property="og:image" content="__OG_IMAGE__">
+<meta property="og:image:alt" content="Video thumbnail">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="__OG_URL__">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="VideoHub">
+<meta name="twitter:description" content="Watch this video on VideoHub.">
+<meta name="twitter:image" content="__OG_IMAGE__">
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
-<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 
 <style>
 :root {
@@ -36,19 +49,6 @@ header{position:sticky;top:0;z-index:10;background:var(--bg);display:flex;align-
 .chip{background:var(--sur);padding:0 14px;height:32px;border-radius:8px;font-size:14px;font-weight:500;white-space:nowrap;flex:none}
 .chip.active{background:var(--text);color:#0f0f0f}
 
-/* X importer */
-#importer{margin:8px 12px 16px;padding:14px;background:#181818;border:1px solid #303030;border-radius:12px}
-.import-head{display:flex;align-items:center;gap:9px;font-weight:700;margin-bottom:10px}
-.x-logo{width:30px;height:30px;display:grid;place-items:center;background:#fff;color:#000;border-radius:50%;font-weight:800;font-size:18px}
-.import-row{display:flex;gap:8px}
-#importUrl{flex:1;min-width:0;background:#101010;color:#fff;border:1px solid #383838;border-radius:8px;padding:12px;font-size:14px;outline:none}
-.primary{background:#f1f1f1;color:#111;border-radius:8px;padding:0 14px;font-weight:700;min-height:42px}
-#importMessage{font-size:13px;color:var(--mute);margin-top:9px}
-#xResult{margin-top:12px}
-#xResult:empty{display:none}
-.x-post{background:#101010;border:1px solid #333;border-radius:12px;padding:10px;overflow:hidden}
-.x-post blockquote{margin:0 auto!important;max-width:550px!important}
-.x-open{display:inline-block;color:#ddd;margin-top:10px;font-size:13px}
 
 #grid{display:grid;gap:20px 16px;grid-template-columns:1fr;padding:6px 0 24px}
 @media(min-width:560px){#grid{grid-template-columns:repeat(2,1fr);padding:10px 16px 24px}}
@@ -135,15 +135,6 @@ header{position:sticky;top:0;z-index:10;background:var(--bg);display:flex;align-
 
 <div class="chips" id="chips"></div>
 
-<section id="importer">
- <div class="import-head"><span class="x-logo">𝕏</span><span>Open a video from X / Twitter</span></div>
- <form id="importForm" class="import-row">
-  <input id="importUrl" type="url" placeholder="Paste an X video post link..." autocomplete="url" required>
-  <button class="primary" type="submit">Load</button>
- </form>
- <div id="importMessage">Paste a post URL such as x.com/username/status/123456789.</div>
- <div id="xResult"></div>
-</section>
 
 <div id="grid"></div>
 <div id="sentinel"></div>
@@ -660,7 +651,6 @@ async function loadSharedVideo() {
  const match = location.pathname.match(/^\/watch\/([a-zA-Z0-9_-]{8,30})\/?$/);
  if (!match) return false;
 
- $("importer").style.display = "none";
  $("grid").style.display = "none";
  $("chips").style.display = "none";
  $("status").textContent = "Loading shared video...";
@@ -688,102 +678,6 @@ async function loadSharedVideo() {
  }
 }
 
-/* X / Twitter URL importer. Uses the official embed widget, not a downloader. */
-
-function getXStatusUrl(raw) {
- try {
-  const url = new URL(raw);
-  const host = url.hostname.toLowerCase();
-
-  if (
-   !["x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"].includes(host)
-  ) return null;
-
-  const match = url.pathname.match(/^\/[^/]+\/status\/(\d+)/);
-  if (!match) return null;
-
-  return "https://twitter.com/i/status/" + match[1];
- } catch {
-  return null;
- }
-
-}
-
-function renderXEmbed(statusUrl) {
- const result = $("xResult");
- result.replaceChildren();
-
- const box = document.createElement("div");
- box.className = "x-post";
-
- const blockquote = document.createElement("blockquote");
- blockquote.className = "twitter-tweet";
- blockquote.setAttribute("data-dnt", "true");
-
- const link = document.createElement("a");
- link.href = statusUrl;
- link.textContent = "View this post on X";
-
- blockquote.appendChild(link);
- box.appendChild(blockquote);
- result.appendChild(box);
-
- const open = document.createElement("a");
- open.className = "x-open";
- open.href = statusUrl.replace("https://twitter.com/", "https://x.com/");
- open.target = "_blank";
- open.rel = "noopener noreferrer";
- open.textContent = "Open original post on X";
- result.appendChild(open);
-
- $("importMessage").textContent = "Loading X post...";
-
- const renderWidget = () => {
-  if (window.twttr && window.twttr.widgets) {
-   window.twttr.widgets.load(result)
-    .then(() => {
-     $("importMessage").textContent =
-      "If the post does not appear, the author may have restricted embedding or deleted it.";
-    })
-    .catch(() => {
-     $("importMessage").textContent = "Could not embed this post. Try opening it on X.";
-    });
-  } else {
-   $("importMessage").textContent = "X embed service is unavailable. Try again later.";
-  }
- };
-
- if (window.twttr && window.twttr.widgets) {
-  renderWidget();
- } else {
-  let attempts = 0;
-  const timer = setInterval(() => {
-   attempts++;
-   if (window.twttr && window.twttr.widgets) {
-    clearInterval(timer);
-    renderWidget();
-   } else if (attempts >= 20) {
-    clearInterval(timer);
-    $("importMessage").textContent = "X embed service did not load. Check your connection.";
-   }
-  }, 300);
- }
-}
-
-$("importForm").addEventListener("submit", event => {
- event.preventDefault();
-
- const statusUrl = getXStatusUrl($("importUrl").value.trim());
-
- if (!statusUrl) {
-  $("importMessage").textContent =
-   "Please paste a valid X/Twitter post URL containing /status/ followed by the post ID.";
-  $("xResult").replaceChildren();
-  return;
- }
-
- renderXEmbed(statusUrl);
-});
 
 /* Search */
 

@@ -9,7 +9,7 @@ const pornhub = require("@justalk/pornhub-api");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || "127.0.0.1";
+const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_DIR = path.join(__dirname, "public");
 
 const UA =
@@ -473,7 +473,7 @@ function cleanVideo(video) {
     };
 }
 
-app.post("/api/share", (req, res) => {
+app.post("/api/share", async (req, res) => {
     const video = cleanVideo(req.body && req.body.video);
 
     if (!video) {
@@ -481,6 +481,16 @@ app.post("/api/share", (req, res) => {
             success: false,
             error: "Invalid video."
         });
+    }
+
+    // Ensure a thumbnail is available for social link previews when possible.
+    if (!video.thumb) {
+        try {
+            const meta = await getMeta(video.url);
+            if (meta && meta.success && meta.thumb) video.thumb = meta.thumb;
+        } catch (error) {
+            console.error("Could not get share thumbnail:", error.message);
+        }
     }
 
     // Reuse the existing ID for the same provider URL.
@@ -550,6 +560,15 @@ app.get("/api/share/:id", (req, res) => {
 /* Serve the app shell for shareable watch URLs.
    The browser reads the ID and retrieves the saved video. */
 
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 app.get("/watch/:id", (req, res, next) => {
     const id = String(req.params.id || "");
 
@@ -557,8 +576,54 @@ app.get("/watch/:id", (req, res, next) => {
         return res.status(404).send("Shared video not found.");
     }
 
-    res.sendFile(path.join(PUBLIC_DIR, "index.html"), error => {
-        if (error && !res.headersSent) next(error);
+    const video = shareLinks.get(id);
+    if (!video) {
+        return res.status(404).send("This shared video could not be found.");
+    }
+
+    const forwardedProto = String(req.get("x-forwarded-proto") || "").split(",")[0].trim();
+    const protocol = forwardedProto === "https" ? "https" : req.protocol;
+    const origin = `${protocol}://${req.get("host")}`;
+    const shareUrl = `${origin}/watch/${id}`;
+    let imageUrl = "";
+
+    if (video.thumb) {
+        try {
+            imageUrl = new URL(video.thumb, origin).href;
+        } catch {}
+    }
+
+    const title = `${video.title || "Video"} | VideoHub`;
+    const description = `Watch ${video.title || "this video"} on VideoHub.`;
+    const safeTitle = escapeHtml(title);
+    const safeDescription = escapeHtml(description);
+    const safeImage = escapeHtml(imageUrl);
+    const safeUrl = escapeHtml(shareUrl);
+
+    fs.readFile(path.join(PUBLIC_DIR, "index.html"), "utf8", (error, html) => {
+        if (error) return next(error);
+
+        const page = html
+            .replace('<title>VideoHub</title>', `<title>${safeTitle}</title>`)
+            .replace('<meta name="description" content="Watch videos on VideoHub.">',
+                `<meta name="description" content="${safeDescription}">`)
+            .replace('<meta property="og:title" content="VideoHub">',
+                `<meta property="og:title" content="${safeTitle}">`)
+            .replace('<meta property="og:description" content="Watch this video on VideoHub.">',
+                `<meta property="og:description" content="${safeDescription}">`)
+            .replace('<meta property="og:image" content="__OG_IMAGE__">',
+                `<meta property="og:image" content="${safeImage}">`)
+            .replace('<meta property="og:url" content="__OG_URL__">',
+                `<meta property="og:url" content="${safeUrl}">`)
+            .replace('<meta name="twitter:title" content="VideoHub">',
+                `<meta name="twitter:title" content="${safeTitle}">`)
+            .replace('<meta name="twitter:description" content="Watch this video on VideoHub.">',
+                `<meta name="twitter:description" content="${safeDescription}">`)
+            .replace('<meta name="twitter:image" content="__OG_IMAGE__">',
+                `<meta name="twitter:image" content="${safeImage}">`);
+
+        res.set("Cache-Control", "public, max-age=60");
+        res.type("html").send(page);
     });
 });
 
