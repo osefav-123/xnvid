@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f0f0f">
+<title>VideoHub</title>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+
+<style>
+:root {
+    --bg:#0f0f0f;
+    --sur:#272727;
+    --text:#f1f1f1;
+    --mute:#aaa;
+    --red:#f03;
+    --border:#303030;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font-family:Roboto,Arial,sans-serif;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+button,input{font-family:inherit}
+button{cursor:pointer;border:0;color:var(--text)}
+header{position:sticky;top:0;z-index:10;background:var(--bg);display:flex;align-items:center;gap:10px;padding:8px 12px;height:56px}
+.logo{display:flex;align-items:center;gap:6px;font-weight:700;font-size:19px;letter-spacing:-.5px;white-space:nowrap}
+.logo i{width:28px;height:20px;background:var(--red);border-radius:6px;position:relative;display:inline-block}
+.logo i:after{content:"";position:absolute;left:11px;top:5px;border-left:8px solid #fff;border-top:5px solid transparent;border-bottom:5px solid transparent}
+@media(max-width:380px){.logo span{display:none}}
+#searchForm{flex:1;display:flex;max-width:640px;margin:0 auto}
+#query{flex:1;min-width:0;background:#121212;border:1px solid var(--border);border-right:0;color:var(--text);padding:0 16px;height:38px;border-radius:20px 0 0 20px;font-size:16px;outline:0}
+#searchForm button{width:54px;height:38px;background:#222;border:1px solid var(--border);border-radius:0 20px 20px 0}
+.chips{position:sticky;top:56px;z-index:9;background:var(--bg);display:flex;gap:10px;overflow-x:auto;padding:6px 12px 10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{background:var(--sur);padding:0 14px;height:32px;border-radius:8px;font-size:14px;font-weight:500;white-space:nowrap;flex:none}
+.chip.active{background:var(--text);color:#0f0f0f}
+
+/* X importer */
+#importer{margin:8px 12px 16px;padding:14px;background:#181818;border:1px solid #303030;border-radius:12px}
+.import-head{display:flex;align-items:center;gap:9px;font-weight:700;margin-bottom:10px}
+.x-logo{width:30px;height:30px;display:grid;place-items:center;background:#fff;color:#000;border-radius:50%;font-weight:800;font-size:18px}
+.import-row{display:flex;gap:8px}
+#importUrl{flex:1;min-width:0;background:#101010;color:#fff;border:1px solid #383838;border-radius:8px;padding:12px;font-size:14px;outline:none}
+.primary{background:#f1f1f1;color:#111;border-radius:8px;padding:0 14px;font-weight:700;min-height:42px}
+#importMessage{font-size:13px;color:var(--mute);margin-top:9px}
+#xResult{margin-top:12px}
+#xResult:empty{display:none}
+.x-post{background:#101010;border:1px solid #333;border-radius:12px;padding:10px;overflow:hidden}
+.x-post blockquote{margin:0 auto!important;max-width:550px!important}
+.x-open{display:inline-block;color:#ddd;margin-top:10px;font-size:13px}
+
+#grid{display:grid;gap:20px 16px;grid-template-columns:1fr;padding:6px 0 24px}
+@media(min-width:560px){#grid{grid-template-columns:repeat(2,1fr);padding:10px 16px 24px}}
+@media(min-width:900px){#grid{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:1250px){#grid{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:1700px){#grid{grid-template-columns:repeat(5,1fr)}}
+.card{cursor:pointer;min-width:0}
+.thumb{position:relative;aspect-ratio:16/9;background:#1a1a1a;overflow:hidden}
+@media(min-width:560px){.thumb{border-radius:12px}}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .25s}
+.thumb img.in{opacity:1}
+.dur,.hd{position:absolute;bottom:6px;background:rgba(0,0,0,.8);font-size:12px;font-weight:500;padding:1px 5px;border-radius:4px}
+.dur{right:6px}.hd{left:6px}
+.meta{display:flex;gap:12px;padding:10px 12px 0}
+@media(min-width:560px){.meta{padding:10px 0 0}}
+.av{width:36px;height:36px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
+.tx{min-width:0}
+.ttl{font-size:15px;font-weight:500;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sub{color:var(--mute);font-size:13px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ad-card{cursor:default;min-width:0}
+.ad-label{color:var(--mute);font-size:12px;padding:7px 12px}
+.external-ad-frame{display:block;width:100%;height:280px;border:0;background:#171717}
+@media(min-width:560px){.external-ad-frame{border-radius:10px}}
+.native-ad{width:100%;min-height:100px;overflow:hidden}
+.native-ad iframe{max-width:100%}
+.sk .thumb,.sk .l{background:linear-gradient(90deg,#1c1c1c,#2a2a2a,#1c1c1c);background-size:200% 100%;animation:sh 1.2s infinite}
+.sk .av{background:#222}
+.sk .l{height:14px;border-radius:6px;margin-bottom:8px}
+@keyframes sh{to{background-position:-200% 0}}
+#status{text-align:center;color:var(--mute);padding:16px}
+#status button{background:var(--sur);border-radius:18px;height:36px;padding:0 18px;margin-left:8px}
+#sentinel{height:1px}
+
+/* Watch screen */
+#watch{position:fixed;inset:0;z-index:30;background:var(--bg);display:none;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.wbar{display:flex;align-items:center;padding:4px 8px;background:#000}
+.wbar button{background:none;font-size:22px;width:44px;height:44px}
+.pwrap{position:sticky;top:0;z-index:3;background:#000}
+#player{width:100%;aspect-ratio:16/9;background:#000;display:block;max-height:75vh}
+.winfo{padding:12px}
+#vtitle{font-size:18px;font-weight:600;line-height:1.3;margin:0 0 6px}
+#pstatus{color:var(--mute);font-size:13px;min-height:16px}
+.arow{display:flex;align-items:center;gap:10px;margin:12px 0;flex-wrap:wrap}
+.arow .name{font-weight:500;flex:1;min-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{background:var(--sur);border-radius:18px;min-height:36px;padding:0 16px;font-size:14px;font-weight:500}
+#share{background:#f1f1f1;color:#111}
+#share:disabled{opacity:.6}
+.side h4{margin:8px 12px;font-size:16px}
+.upgrid{display:grid;gap:16px;padding-bottom:40px}
+#shareStatus{font-size:12px;color:var(--mute);width:100%;overflow-wrap:anywhere}
+@media(min-width:1000px){
+ .wrap{display:flex;gap:24px;padding:16px 24px;max-width:1700px;margin:0 auto}
+ .main{flex:1;min-width:0}.pwrap{position:static}
+ #player{border-radius:12px}.winfo{padding:12px 0}
+ .side{width:400px;flex:none}.side h4{margin:0 0 12px}
+ .wbar{background:var(--bg)}
+}
+
+/* Age confirmation and toast */
+#gate{position:fixed;inset:0;background:var(--bg);z-index:50;display:none;align-items:center;justify-content:center;text-align:center;padding:24px}
+#gate div{max-width:340px}
+#gate p{color:var(--mute)}
+#gate button{background:var(--text);color:#0f0f0f;border-radius:18px;height:40px;padding:0 24px;font-weight:600;font-size:15px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#f1f1f1;color:#0f0f0f;padding:10px 16px;border-radius:8px;display:none;z-index:60;font-size:14px;max-width:90%;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+
+<div id="gate">
+ <div>
+  <h2>Adults only (18+)</h2>
+  <p>This site contains adult content. Confirm you are 18 or older to continue.</p>
+  <button id="enter">I am 18 or older</button>
+ </div>
+</div>
+
+<header>
+ <div class="logo"><i></i><span>VideoHub</span></div>
+ <form id="searchForm">
+  <input id="query" placeholder="Search" autocomplete="off">
+  <button aria-label="Search">&#128269;</button>
+ </form>
+</header>
+
+<div class="chips" id="chips"></div>
+
+<section id="importer">
+ <div class="import-head"><span class="x-logo">𝕏</span><span>Open a video from X / Twitter</span></div>
+ <form id="importForm" class="import-row">
+  <input id="importUrl" type="url" placeholder="Paste an X video post link..." autocomplete="url" required>
+  <button class="primary" type="submit">Load</button>
+ </form>
+ <div id="importMessage">Paste a post URL such as x.com/username/status/123456789.</div>
+ <div id="xResult"></div>
+</section>
+
+<div id="grid"></div>
+<div id="sentinel"></div>
+<div id="status"></div>
+
+<section id="native-ad-wrapper" style="padding:12px">
+ <div class="ad-label">Advertisement</div>
+ <div class="native-ad"><div id="container-2e19c0d4a78d89aa8c8db78ea2a31902"></div></div>
+</section>
+
+<div id="watch">
+ <div class="wbar"><button id="back" aria-label="Back">&#8592;</button></div>
+ <div class="wrap">
+  <div class="main">
+   <div class="pwrap"><video id="player" controls playsinline></video></div>
+   <div class="winfo">
+    <h1 id="vtitle"></h1>
+    <div id="pstatus"></div>
+    <div class="arow">
+     <div class="av" id="wav"></div>
+     <div class="name" id="wname"></div>
+     <button class="pill" id="share">Share</button>
+     <button class="pill" id="copyShare">Copy link</button>
+     <div id="shareStatus"></div>
+    </div>
+   </div>
+  </div>
+  <div class="side"><h4>Up next</h4><div id="related" class="upgrid"></div></div>
+ </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const EXTERNAL_AD_URL = "https://apiguinee.org/4/35f8fcc537830ba1a7e7c3c8a4dbb93a";
+const $ = id => document.getElementById(id);
+const grid = $("grid");
+const statusEl = $("status");
+const player = $("player");
+const related = $("related");
+
+const CATS = [
+ "Amateur","Asian","Latina","Lesbian","Mature","Compilation","Massage",
+ "Couples","POV","Blonde","Brunette","Redhead","Ebony","Homemade","Outdoor"
+];
+
+let mode = "home";
+let q = "";
+let page = 1;
+let startPage = 1;
+let loading = false;
+let hasMore = true;
+let token = 0;
+let emptyTries = 0;
+let loaded = [];
+let seen = new Set();
+let count = 0;
+let adShown = false;
+let hls = null;
+let current = null;
+let watchOpen = false;
+let shareUrl = "";
+let watchRequest = 0;
+
+function toast(message) {
+ const el = $("toast");
+ el.textContent = message;
+ el.style.display = "block";
+ clearTimeout(toast.timer);
+ toast.timer = setTimeout(() => el.style.display = "none", 2200);
+}
+
+function hue(s) {
+ let h = 0;
+ for (const c of String(s || "")) h = (h * 31 + c.charCodeAt(0)) % 360;
+ return h;
+}
+
+function fmt(sec) {
+ sec = Math.floor(Number(sec) || 0);
+ const h = Math.floor(sec / 3600);
+ const m = Math.floor(sec % 3600 / 60);
+ const x = String(sec % 60).padStart(2, "0");
+ return h ? h + ":" + String(m).padStart(2, "0") + ":" + x : m + ":" + x;
+}
+
+function avatar(el, name) {
+ const n = (name || "?").trim() || "?";
+ el.textContent = n[0].toUpperCase();
+ el.style.background = "hsl(" + hue(n) + ",45%,35%)";
+}
+
+const metaQ = [];
+let metaBusy = 0;
+
+function pumpMeta() {
+ while (metaBusy < 2 && metaQ.length) {
+  const job = metaQ.shift();
+  metaBusy++;
+  fetch("/api/meta?url=" + encodeURIComponent(job.url))
+   .then(r => r.json())
+   .then(job.done)
+   .catch(() => {})
+   .finally(() => { metaBusy--; pumpMeta(); });
+ }
+}
+
+const io = new IntersectionObserver(entries => {
+ entries.forEach(entry => {
+  if (entry.isIntersecting) {
+   io.unobserve(entry.target);
+   if (entry.target._load) entry.target._load();
+  }
+ });
+}, { rootMargin: "300px" });
+
+function setThumb(th, src) {
+ if (!src) return;
+ const img = new Image();
+ img.alt = "";
+ img.decoding = "async";
+ img.loading = "lazy";
+ img.onload = () => img.classList.add("in");
+ th.prepend(img);
+ img.src = src;
+}
+
+function setDur(th, sec) {
+ const el = document.createElement("span");
+ el.className = "dur";
+ el.textContent = fmt(sec);
+ th.appendChild(el);
+}
+
+function makeCard(v) {
+ const card = document.createElement("div");
+ card.className = "card";
+
+ const th = document.createElement("div");
+ th.className = "thumb";
+ if (v.thumb) setThumb(th, v.thumb);
+ if (v.duration) setDur(th, v.duration);
+
+ if (v.hd) {
+  const badge = document.createElement("span");
+  badge.className = "hd";
+  badge.textContent = "HD";
+  th.appendChild(badge);
+ }
+
+ const meta = document.createElement("div");
+ meta.className = "meta";
+
+ const av = document.createElement("div");
+ av.className = "av";
+ avatar(av, v.author);
+
+ const tx = document.createElement("div");
+ tx.className = "tx";
+
+ const title = document.createElement("div");
+ title.className = "ttl";
+ title.textContent = v.title || "Video";
+
+ const sub = document.createElement("div");
+ sub.className = "sub";
+ sub.textContent = v.author || "";
+
+ tx.append(title, sub);
+ meta.append(av, tx);
+ card.append(th, meta);
+ card.addEventListener("click", () => openVideo(v));
+
+ if (!v.thumb || !v.duration) {
+  card._load = () => {
+   metaQ.push({
+    url: v.url,
+    done: data => {
+     if (!data || !data.success) return;
+     if (data.thumb && !v.thumb) setThumb(th, data.thumb);
+     if (data.duration && !v.duration) setDur(th, data.duration);
+    }
+   });
+   pumpMeta();
+  };
+  io.observe(card);
+ }
+ return card;
+}
+
+function makeExternalAd() {
+ const card = document.createElement("div");
+ card.className = "ad-card";
+
+ const label = document.createElement("div");
+ label.className = "ad-label";
+ label.textContent = "Advertisement";
+
+ const frame = document.createElement("iframe");
+ frame.className = "external-ad-frame";
+ frame.src = EXTERNAL_AD_URL;
+ frame.title = "Advertisement";
+ frame.loading = "lazy";
+ frame.referrerPolicy = "strict-origin-when-cross-origin";
+ frame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms allow-popups");
+
+ card.append(label, frame);
+ return card;
+}
+
+function addToGrid(video) {
+ if (count === 2 && !adShown) {
+  grid.appendChild(makeExternalAd());
+  adShown = true;
+ }
+ grid.appendChild(makeCard(video));
+ count++;
+}
+
+function skeletons(n) {
+ for (let i = 0; i < n; i++) {
+  const card = document.createElement("div");
+  card.className = "card sk";
+  card.innerHTML =
+   '<div class="thumb"></div><div class="meta"><div class="av"></div>' +
+   '<div style="flex:1"><div class="l" style="width:90%"></div>' +
+   '<div class="l" style="width:50%"></div></div></div>';
+  grid.appendChild(card);
+ }
+}
+
+function clearSk() {
+ grid.querySelectorAll(".sk").forEach(el => el.remove());
+}
+
+async function load(reset) {
+ if (loading && !reset) return;
+
+ const my = ++token;
+ loading = true;
+
+ if (reset) {
+  seen = new Set();
+  loaded = [];
+  count = 0;
+  adShown = false;
+  emptyTries = 0;
+  hasMore = true;
+  page = startPage;
+  grid.replaceChildren();
+ }
+
+ statusEl.textContent = "";
+ skeletons(reset ? 6 : 3);
+
+ try {
+  const url = mode === "home"
+   ? "/api/home"
+   : "/api/search?q=" + encodeURIComponent(q) + "&page=" + page;
+
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (my !== token) return;
+  if (!response.ok || !data.success) throw new Error(data.error || "Could not load videos");
+
+  clearSk();
+
+  const fresh = (data.videos || []).filter(v => !seen.has(v.url));
+  fresh.forEach(video => {
+   seen.add(video.url);
+   loaded.push(video);
+   addToGrid(video);
+  });
+
+  if (mode === "home") hasMore = fresh.length > 0 || ++emptyTries < 3;
+  else hasMore = (data.videos || []).length > 0;
+
+  page++;
+  if (!loaded.length) statusEl.textContent = "No results";
+ } catch (error) {
+  if (my === token) {
+   clearSk();
+   statusEl.textContent = error.message + " ";
+   const button = document.createElement("button");
+   button.textContent = "Retry";
+   button.onclick = () => load(!loaded.length);
+   statusEl.appendChild(button);
+  }
+ } finally {
+  if (my === token) loading = false;
+ }
+}
+
+const sentinelObserver = new IntersectionObserver(entries => {
+ if (entries[0].isIntersecting && !loading && hasMore && loaded.length) load(false);
+}, { rootMargin: "900px" });
+
+sentinelObserver.observe($("sentinel"));
+
+function setCat(name) {
+ document.querySelectorAll(".chip").forEach(chip => {
+  chip.classList.toggle("active", chip.textContent === name);
+ });
+
+ $("query").value = "";
+
+ if (name === "Home") {
+  mode = "home";
+  q = "";
+  startPage = 1;
+ } else {
+  mode = "search";
+  q = name.toLowerCase();
+  startPage = 1;
+ }
+
+ load(true);
+ window.scrollTo({ top: 0 });
+}
+
+["Home", ...CATS].forEach(name => {
+ const button = document.createElement("button");
+ button.className = "chip";
+ button.textContent = name;
+ button.addEventListener("click", () => setCat(name));
+ $("chips").appendChild(button);
+});
+
+/* Generate and retain a VideoHub link for the current video. */
+
+async function createShareLink(video) {
+ const response = await fetch("/api/share", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ video })
+ });
+
+ const data = await response.json();
+ if (!response.ok || !data.success) {
+  throw new Error(data.error || "Could not create share link");
+ }
+
+ shareUrl = data.url;
+ $("shareStatus").textContent = "VideoHub link: " + shareUrl;
+ return shareUrl;
+}
+
+async function copyText(text) {
+ if (navigator.clipboard && window.isSecureContext) {
+  await navigator.clipboard.writeText(text);
+  return;
+ }
+
+ const textarea = document.createElement("textarea");
+ textarea.value = text;
+ textarea.style.position = "fixed";
+ textarea.style.opacity = "0";
+ document.body.appendChild(textarea);
+ textarea.select();
+
+ const ok = document.execCommand("copy");
+ textarea.remove();
+
+ if (!ok) throw new Error("Copy failed");
+}
+
+async function shareCurrent() {
+ if (!current) return;
+
+ const button = $("share");
+ button.disabled = true;
+
+ try {
+  const url = shareUrl || await createShareLink(current);
+
+  if (navigator.share) {
+   try {
+    await navigator.share({
+     title: current.title || "VideoHub video",
+     text: "Watch this video on VideoHub",
+     url
+    });
+   } catch (error) {
+    if (error.name !== "AbortError") await copyText(url);
+   }
+  } else {
+   await copyText(url);
+  }
+
+  toast("Your VideoHub link is ready");
+ } catch (error) {
+  toast(error.message || "Could not create share link");
+ } finally {
+  button.disabled = false;
+ }
+}
+
+$("share").addEventListener("click", shareCurrent);
+
+$("copyShare").addEventListener("click", async () => {
+ if (!current) return;
+
+ try {
+  const url = shareUrl || await createShareLink(current);
+  await copyText(url);
+  toast("VideoHub link copied");
+ } catch (error) {
+  toast(error.message || "Could not copy link");
+ }
+});
+
+/* Open a video, including a shared video loaded by ID. */
+
+async function openVideo(video, options = {}) {
+ const requestId = ++watchRequest;
+ current = video;
+ shareUrl = options.shareUrl || "";
+
+ $("vtitle").textContent = video.title || "Video";
+ $("wname").textContent = video.author || "";
+ avatar($("wav"), video.author);
+ $("pstatus").textContent = "Loading video...";
+ $("shareStatus").textContent = shareUrl ? "VideoHub link: " + shareUrl : "";
+ $("watch").style.display = "block";
+ $("watch").scrollTop = 0;
+ document.body.style.overflow = "hidden";
+
+ if (!watchOpen && !options.fromHistory) {
+  history.pushState({ watch: true }, "", options.url || location.pathname + location.search);
+  watchOpen = true;
+ } else {
+  watchOpen = true;
+ }
+
+ related.replaceChildren();
+
+ const pool = loaded.filter(v => v.url !== video.url);
+ for (let i = pool.length - 1; i > 0; i--) {
+  const j = Math.floor(Math.random() * (i + 1));
+  [pool[i], pool[j]] = [pool[j], pool[i]];
+ }
+ pool.slice(0, 12).forEach(v => related.appendChild(makeCard(v)));
+
+ if (hls) {
+  hls.destroy();
+  hls = null;
+ }
+
+ player.pause();
+ player.removeAttribute("src");
+ player.load();
+
+ try {
+  const response = await fetch("/api/stream?url=" + encodeURIComponent(video.url));
+  const data = await response.json();
+
+  if (requestId !== watchRequest || current !== video) return;
+  if (!response.ok || !data.success) throw new Error(data.error || "Failed to load video");
+
+  if (data.hls && window.Hls && Hls.isSupported()) {
+   hls = new Hls();
+   hls.on(Hls.Events.ERROR, (event, info) => {
+    if (info.fatal && requestId === watchRequest) {
+     $("pstatus").textContent = "Playback error: " + info.details;
+    }
+   });
+   hls.loadSource(data.url);
+   hls.attachMedia(player);
+  } else {
+   player.src = data.url;
+  }
+
+  $("pstatus").textContent = "";
+  player.play().catch(() => {});
+ } catch (error) {
+  if (requestId === watchRequest && current === video) {
+   $("pstatus").textContent = error.message;
+  }
+ }
+}
+
+function hideWatch() {
+ watchRequest++;
+
+ if (hls) {
+  hls.destroy();
+  hls = null;
+ }
+
+ player.pause();
+ player.removeAttribute("src");
+ player.load();
+
+ $("watch").style.display = "none";
+ document.body.style.overflow = "";
+ watchOpen = false;
+ current = null;
+ shareUrl = "";
+}
+
+$("back").addEventListener("click", () => {
+ if (watchOpen) history.back();
+ else hideWatch();
+});
+
+window.addEventListener("popstate", () => {
+ if (watchOpen) hideWatch();
+});
+
+/* When someone opens /watch/SHARE_ID, retrieve the server-side record. */
+
+async function loadSharedVideo() {
+ const match = location.pathname.match(/^\/watch\/([a-zA-Z0-9_-]{8,30})\/?$/);
+ if (!match) return false;
+
+ $("importer").style.display = "none";
+ $("grid").style.display = "none";
+ $("chips").style.display = "none";
+ $("status").textContent = "Loading shared video...";
+
+ try {
+  const response = await fetch("/api/share/" + encodeURIComponent(match[1]));
+  const data = await response.json();
+  if (!response.ok || !data.success) throw new Error(data.error || "Shared video not found");
+
+  $("status").textContent = "";
+
+  const video = data.video;
+  const url = location.origin + "/watch/" + encodeURIComponent(match[1]);
+
+  await openVideo(video, {
+   shareUrl: url,
+   url: location.pathname,
+   fromHistory: true
+  });
+
+  return true;
+ } catch (error) {
+  $("status").textContent = error.message;
+  return true;
+ }
+}
+
+/* X / Twitter URL importer. Uses the official embed widget, not a downloader. */
+
+function getXStatusUrl(raw) {
+ try {
+  const url = new URL(raw);
+  const host = url.hostname.toLowerCase();
+
+  if (
+   !["x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"].includes(host)
+  ) return null;
+
+  const match = url.pathname.match(/^\/[^/]+\/status\/(\d+)/);
+  if (!match) return null;
+
+  return "https://twitter.com/i/status/" + match[1];
+ } catch {
+  return null;
+ }
+
+}
+
+function renderXEmbed(statusUrl) {
+ const result = $("xResult");
+ result.replaceChildren();
+
+ const box = document.createElement("div");
+ box.className = "x-post";
+
+ const blockquote = document.createElement("blockquote");
+ blockquote.className = "twitter-tweet";
+ blockquote.setAttribute("data-dnt", "true");
+
+ const link = document.createElement("a");
+ link.href = statusUrl;
+ link.textContent = "View this post on X";
+
+ blockquote.appendChild(link);
+ box.appendChild(blockquote);
+ result.appendChild(box);
+
+ const open = document.createElement("a");
+ open.className = "x-open";
+ open.href = statusUrl.replace("https://twitter.com/", "https://x.com/");
+ open.target = "_blank";
+ open.rel = "noopener noreferrer";
+ open.textContent = "Open original post on X";
+ result.appendChild(open);
+
+ $("importMessage").textContent = "Loading X post...";
+
+ const renderWidget = () => {
+  if (window.twttr && window.twttr.widgets) {
+   window.twttr.widgets.load(result)
+    .then(() => {
+     $("importMessage").textContent =
+      "If the post does not appear, the author may have restricted embedding or deleted it.";
+    })
+    .catch(() => {
+     $("importMessage").textContent = "Could not embed this post. Try opening it on X.";
+    });
+  } else {
+   $("importMessage").textContent = "X embed service is unavailable. Try again later.";
+  }
+ };
+
+ if (window.twttr && window.twttr.widgets) {
+  renderWidget();
+ } else {
+  let attempts = 0;
+  const timer = setInterval(() => {
+   attempts++;
+   if (window.twttr && window.twttr.widgets) {
+    clearInterval(timer);
+    renderWidget();
+   } else if (attempts >= 20) {
+    clearInterval(timer);
+    $("importMessage").textContent = "X embed service did not load. Check your connection.";
+   }
+  }, 300);
+ }
+}
+
+$("importForm").addEventListener("submit", event => {
+ event.preventDefault();
+
+ const statusUrl = getXStatusUrl($("importUrl").value.trim());
+
+ if (!statusUrl) {
+  $("importMessage").textContent =
+   "Please paste a valid X/Twitter post URL containing /status/ followed by the post ID.";
+  $("xResult").replaceChildren();
+  return;
+ }
+
+ renderXEmbed(statusUrl);
+});
+
+/* Search */
+
+$("searchForm").addEventListener("submit", event => {
+ event.preventDefault();
+
+ const value = $("query").value.trim();
+ if (!value) return;
+
+ document.querySelectorAll(".chip").forEach(chip => chip.classList.remove("active"));
+
+ mode = "search";
+ q = value;
+ startPage = 1;
+
+ load(true);
+ window.scrollTo({ top: 0 });
+});
+
+/* Age confirmation */
+
+try {
+ if (!localStorage.getItem("age_ok")) $("gate").style.display = "flex";
+} catch {
+ $("gate").style.display = "flex";
+}
+
+$("enter").addEventListener("click", () => {
+ try { localStorage.setItem("age_ok", "1"); } catch {}
+ $("gate").style.display = "none";
+});
+
+/* Start */
+
+(async () => {
+ const isShared = await loadSharedVideo();
+
+ if (!isShared) {
+  setCat("Home");
+ }
+})();
+</script>
+
+<!-- Social bar advertising -->
+<script data-cfasync="false" src="https://biomanos.org/14/fbeae4879e6243b2e968be52b302b936"></script>
+
+<!-- Native banner advertising -->
+<script async="async" data-cfasync="false" src="https://biomanos.org/21/2e19c0d4a78d89aa8c8db78ea2a31902"></script>
+
+<!-- Pop-under advertising -->
+<script data-cfasync="false" src="https://benchform.org/1/a0fefb612adcbc937a112b25e3bc6278"></script>
+
+</body>
+</html>
